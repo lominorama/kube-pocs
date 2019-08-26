@@ -1,0 +1,183 @@
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: traefik-ingress-controller
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - services
+      - endpoints
+      - secrets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - extensions
+    resources:
+      - ingresses
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - extensions
+    resources:
+      - ingresses/status
+    verbs:
+      - update
+
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: traefik-ingress-controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: traefik-ingress-controller
+subjects:
+  - kind: ServiceAccount
+    name: traefik-ingress-controller
+    namespace: traefik
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: traefik-ingress-controller
+  namespace: traefik
+
+---
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: traefik-ingress-controller
+  namespace: traefik
+  labels:
+    k8s-app: traefik-ingress-controller
+spec:
+  selector:
+    matchLabels:
+      k8s-app: traefik-ingress-controller
+  template:
+    metadata:
+      labels:
+        k8s-app: traefik-ingress-controller
+        name: traefik-ingress-controller
+        rollout: '2'
+    spec:
+      serviceAccountName: traefik-ingress-controller
+      terminationGracePeriodSeconds: 60
+      priorityClassName: traefik
+      containers:
+        - image: traefik:1.7.12
+          name: traefik-ingress-controller
+          env:
+          - name: AWS_REGION
+            value: eu-west-1
+          - name: AWS_HOSTED_ZONE_ID
+            value: Z30VJMXHAQI8AK
+          ports:
+            - name: http
+              containerPort: 80
+              hostPort: 80
+            - name: https
+              containerPort: 443
+              hostPort: 443
+            - name: api
+              containerPort: 8080
+          securityContext:
+            capabilities:
+              drop:
+                - ALL
+              add:
+                - NET_BIND_SERVICE
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "50Mi"
+            limits:
+              cpu: "100m"
+              memory: "100Mi"
+          readinessProbe:
+            tcpSocket:
+              port: 80
+            failureThreshold: 1
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 2
+          livenessProbe:
+            tcpSocket:
+              port: 80
+            failureThreshold: 3
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 2
+          args:
+            - --etcd
+            - --etcd.endpoint=etcd-client:2379
+            - --etcd.prefix=/traefik
+            - --etcd.useapiv3
+            - --etcd.watch
+
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: traefik-ingress-controller
+  namespace: traefik
+  labels:
+    k8s-app: traefik-ingress-controller
+spec:
+  selector:
+    k8s-app: traefik-ingress-controller
+  ports:
+    - protocol: TCP
+      port: 80
+      name: http
+    - protocol: TCP
+      port: 443
+      name: https
+    - protocol: TCP
+      port: 8080
+      name: api
+
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: traefik
+    external-dns.alpha.kubernetes.io/target: kube-ingress.k8s.lominorama.com
+  name: traefik-web-ui
+  namespace: traefik
+spec:
+  rules:
+    - host: traefik.k8s.lominorama.com
+      http:
+        paths:
+          - path: /
+            backend:
+              serviceName: traefik-ingress-controller
+              servicePort: api
+
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: traefik-health-backend
+  namespace: traefik
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /health
+            backend:
+              serviceName: traefik-ingress-controller
+              servicePort: api
+

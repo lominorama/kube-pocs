@@ -1,0 +1,69 @@
+############################################################
+### WARNING: do not modify an existent Traefik ConfigMap ###
+### Write a new one and then point Traefik daemonset to  ###
+### the new version so a rolling update is automatically ###
+### triggered                                            ###
+############################################################
+
+apiVersion: v1
+kind: List
+items:
+
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: traefik-v1
+      namespace: traefik
+      labels:
+        k8s-app: traefik-ingress-controller
+    data:
+      traefik.toml: |
+        logLevel = "INFO"
+        defaultEntryPoints = ["http","https"]
+        
+        [entryPoints]
+          [entryPoints.http]
+            address = ":80"
+            compress = true
+          [entryPoints.https]
+            address = ":443"
+            compress = true
+            [entryPoints.https.tls]
+          [entryPoints.traefik]
+            address = ":8080"
+            compress = true
+       
+        [kubernetes]
+      
+        [traefikLog]
+          format = "common"
+
+        [accessLog]
+          format = "json"
+        
+        [api]
+          entryPoint = "traefik"
+          dashboard = true
+        
+        [metrics]
+          [metrics.prometheus]
+            entryPoint = "traefik"
+            buckets = [0.1,0.3,1.2,5.0]
+        
+        [acme]
+          storage = "/traefik/acme/account"
+          acmeLogging = true
+          onHostRule = true
+          entryPoint = "https"
+          email = "roivazquez@gmail.com"
+          caServer = "https://acme-staging-v02.api.letsencrypt.org/directory"
+          # [acme.dnsChallenge]
+          #   provider = "route53"
+          #   delayBeforeCheck = 0
+          [acme.tlsChallenge]
+        
+        [etcd]
+        endpoint = "etcd-client:2379"
+        watch = true
+        prefix = "/traefik"
+        useAPIV3 = true

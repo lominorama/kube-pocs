@@ -1,0 +1,34 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: "traefik-storeconfig-job-"
+  namespace: traefik
+  labels:
+    k8s-app: traefik-storeconfig-job
+spec:
+  template:
+    metadata:
+      name: "traefik-storeconfig-job"
+      labels:
+        k8s-app: traefik-storeconfig-job
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: storeconfig-job
+          image: traefik:1.7.12
+          args:
+          - storeconfig
+          - --configfile=/config/traefik.toml
+          # - --etcd
+          # - --etcd.endpoint=etcd-client:2379
+          # - --etcd.prefix=traefik
+          # - --etcd.useapiv3
+          # - --etcd.watch
+
+          volumeMounts:
+            - mountPath: /config
+              name: config
+      volumes:
+        - name: config
+          configMap:
+            name: traefik-v1
