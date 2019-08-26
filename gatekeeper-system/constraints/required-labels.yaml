@@ -1,0 +1,25 @@
+apiVersion: constraints.gatekeeper.sh/v1alpha1
+kind: PodRequiredLabels
+metadata:
+  name: ns-default-pod-required-labels
+spec:
+  match:
+    namespaces: ["default"]
+    # kinds:
+    #   - apiGroups: [""]
+    #     kinds: ["Pod"]
+  parameters:
+    labels: ["app.kubernetes.io/name"]
+
+# ---
+# apiVersion: constraints.gatekeeper.sh/v1alpha1
+# kind: K8sRequiredLabels
+# metadata:
+#   name: ns-must-have-gk
+# spec:
+#   match:
+#     kinds:
+#       - apiGroups: [""]
+#         kinds: ["Namespace"]
+#   parameters:
+#     labels: ["gatekeeper"]
